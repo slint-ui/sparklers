@@ -9,21 +9,21 @@ use objc2::rc::Retained;
 use objc2::runtime::NSObject;
 use objc2::{msg_send, ClassType, MainThreadMarker};
 use objc2_foundation::{NSBundle, NSDictionary, NSError, NSString, NSURL};
+use sparkle_sys::{SPUStandardUpdaterController, SPUUpdater};
 
 use super::delegate::{EventCallback, SparkleDelegate};
 use crate::events::UpdateInfo;
 use crate::{Error, Result};
-use sparkle_sys::{SPUStandardUpdaterController, SPUUpdater};
 
 fn is_valid_bundle() -> bool {
     unsafe {
-        let bundle = NSBundle::mainBundle();
-        let identifier: Option<Retained<NSString>> = msg_send![&bundle, bundleIdentifier];
+        let bundle = dbg!(NSBundle::mainBundle());
+        let identifier: Option<Retained<NSString>> = dbg!(msg_send![&bundle, bundleIdentifier]);
         match identifier {
             Some(id) => {
                 let id_str = id.to_string();
                 !id_str.is_empty() && id_str != "com.apple.dt.Xcode.tool"
-            }
+            },
             None => false,
         }
     }
@@ -31,10 +31,7 @@ fn is_valid_bundle() -> bool {
 
 fn init_on_main_thread(
     mtm: MainThreadMarker,
-) -> Result<(
-    MainThreadBound<SparkleUpdater>,
-    Receiver<(String, serde_json::Value)>,
-)> {
+) -> Result<(MainThreadBound<SparkleUpdater>, Receiver<(String, serde_json::Value)>)> {
     check_info_plist_keys();
 
     let (send, recv) = std::sync::mpsc::channel();
@@ -72,27 +69,12 @@ fn init_on_main_thread(
         return Err(Error::SparkleInit("Failed to start updater".to_string()));
     }
 
-    Ok((
-        MainThreadBound::new(
-            SparkleUpdater {
-                controller,
-                delegate,
-            },
-            mtm,
-        ),
-        recv,
-    ))
+    Ok((MainThreadBound::new(SparkleUpdater { controller, delegate }, mtm), recv))
 }
 
 const PLIST_KEY_VALIDATIONS: &[(&str, &str)] = &[
-    (
-        "SUPublicEDKey",
-        "Sparkle will not be able to verify update signatures.",
-    ),
-    (
-        "SUFeedURL",
-        "You must set a feed URL before checking for updates.",
-    ),
+    ("SUPublicEDKey", "Sparkle will not be able to verify update signatures."),
+    ("SUFeedURL", "You must set a feed URL before checking for updates."),
 ];
 
 fn check_info_plist_keys() {
@@ -143,19 +125,14 @@ where
     pub fn new(config: C) -> Result<Option<Self>> {
         if !is_valid_bundle() {
             warn!(
-                "Sparkle updater disabled: not running inside a valid macOS bundle. \
-             This is expected during development. \
-             Sparkle will work in release builds."
+                "Sparkle updater disabled: not running inside a valid macOS bundle. This is \
+                 expected during development. Sparkle will work in release builds."
             );
             return Ok(None);
         }
 
         run_on_main(|mtm| init_on_main_thread(mtm))
-            .map(move |(updater, messages)| Self {
-                config,
-                updater,
-                messages,
-            })
+            .map(move |(updater, messages)| Self { config, updater, messages })
             .map(Some)
     }
 }
@@ -348,13 +325,11 @@ impl<C> Sparkle<C> {
 
     pub fn clear_feed_url_from_user_defaults(&self) -> Result<Option<String>> {
         Ok(self.dispatch(|c| {
-            c.updater()
-                .clear_feed_url_from_user_defaults()
-                .and_then(|url| {
-                    let abs: Option<Retained<NSString>> =
-                        unsafe { objc2::msg_send![&url, absoluteString] };
-                    abs.map(|s| s.to_string())
-                })
+            c.updater().clear_feed_url_from_user_defaults().and_then(|url| {
+                let abs: Option<Retained<NSString>> =
+                    unsafe { objc2::msg_send![&url, absoluteString] };
+                abs.map(|s| s.to_string())
+            })
         }))
     }
 

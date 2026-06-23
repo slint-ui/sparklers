@@ -9,19 +9,18 @@ use objc2::{define_class, msg_send, DeclaredClass, MainThreadMarker, MainThreadO
 use objc2_foundation::{NSArray, NSDictionary, NSMutableSet, NSNumber, NSSet, NSString, NSURL};
 use serde::Serialize;
 use serde_json::Value;
+use sparkle_sys::SPUAppcastItem;
 
-use crate::events::UpdateInfo;
 use crate::events::{
-    DownloadFailedInfo, EmptyPayload, ErrorPayload, ScheduleInfo, UpdateCycleInfo, UserChoiceInfo,
-    VersionInfo, EVENT_DID_ABORT_WITH_ERROR, EVENT_DID_DOWNLOAD_UPDATE, EVENT_DID_EXTRACT_UPDATE,
-    EVENT_DID_FIND_VALID_UPDATE, EVENT_DID_FINISH_LOADING_APPCAST, EVENT_DID_FINISH_UPDATE_CYCLE,
-    EVENT_DID_NOT_FIND_UPDATE, EVENT_FAILED_TO_DOWNLOAD_UPDATE, EVENT_USER_DID_CANCEL_DOWNLOAD,
-    EVENT_USER_DID_MAKE_CHOICE, EVENT_WILL_DOWNLOAD_UPDATE, EVENT_WILL_EXTRACT_UPDATE,
-    EVENT_WILL_INSTALL_UPDATE, EVENT_WILL_INSTALL_UPDATE_ON_QUIT,
+    DownloadFailedInfo, EmptyPayload, ErrorPayload, ScheduleInfo, UpdateCycleInfo, UpdateInfo,
+    UserChoiceInfo, VersionInfo, EVENT_DID_ABORT_WITH_ERROR, EVENT_DID_DOWNLOAD_UPDATE,
+    EVENT_DID_EXTRACT_UPDATE, EVENT_DID_FIND_VALID_UPDATE, EVENT_DID_FINISH_LOADING_APPCAST,
+    EVENT_DID_FINISH_UPDATE_CYCLE, EVENT_DID_NOT_FIND_UPDATE, EVENT_FAILED_TO_DOWNLOAD_UPDATE,
+    EVENT_USER_DID_CANCEL_DOWNLOAD, EVENT_USER_DID_MAKE_CHOICE, EVENT_WILL_DOWNLOAD_UPDATE,
+    EVENT_WILL_EXTRACT_UPDATE, EVENT_WILL_INSTALL_UPDATE, EVENT_WILL_INSTALL_UPDATE_ON_QUIT,
     EVENT_WILL_NOT_SCHEDULE_UPDATE_CHECK, EVENT_WILL_RELAUNCH_APPLICATION,
     EVENT_WILL_SCHEDULE_UPDATE_CHECK,
 };
-use sparkle_sys::SPUAppcastItem;
 
 pub type EventEmitter = Arc<dyn Fn(&str, Value) + Send + Sync>;
 pub type EventCallback = Arc<dyn Fn(&str, &Value) + Send + Sync>;
@@ -437,7 +436,7 @@ impl SparkleDelegate {
                         callback(event, &value);
                     }
                     emitter(event, value)
-                }
+                },
                 Err(e) => error!("Failed to serialize event payload: {}", e),
             }
         }

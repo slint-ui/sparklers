@@ -86,6 +86,7 @@ fn setup_sparkle_framework() {
         let framework_path = path.join("Sparkle.framework");
 
         if framework_path.exists() {
+            println!("cargo::warning=Found framework at {framework_path:?}");
             framework_dir = Some(search_path.clone());
             break;
         }
@@ -96,7 +97,7 @@ fn setup_sparkle_framework() {
     let commit = ref_head.peel_to_commit().unwrap().id();
 
     let framework_dir = framework_dir.unwrap_or_else(|| {
-        eprintln!("Searched paths: {:?}", search_paths);
+        println!("cargo::warning=Searched paths: {:?}", search_paths);
         panic!(
             "\n\
             Sparkle.framework not found!\n\
@@ -109,9 +110,10 @@ fn setup_sparkle_framework() {
         )
     });
 
-    println!("cargo:rustc-link-search=framework={}", framework_dir);
+    println!("cargo:rustc-link-search=framework={framework_dir}");
     println!("cargo:rustc-link-lib=framework=Sparkle");
     println!("cargo:rustc-link-lib=framework=AppKit");
     println!("cargo:rustc-link-lib=framework=Foundation");
+    println!("cargo:rustc-link-arg=-Wl,-rpath,{framework_dir}");
     println!("cargo:rerun-if-env-changed=SPARKLE_FRAMEWORK_PATH");
 }

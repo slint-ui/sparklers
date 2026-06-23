@@ -1,4 +1,5 @@
-use serde::{ser::Serializer, Serialize};
+use serde::ser::Serializer;
+use serde::Serialize;
 
 pub type Result<T> = std::result::Result<T, Error>;
 

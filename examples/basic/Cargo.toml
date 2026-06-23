@@ -1,0 +1,13 @@
+[package]
+name = "sparklers-basic-example"
+version.workspace = true
+description = "Basic example for sparklers"
+authors.workspace = true
+license = "MIT"
+repository.workspace = true
+homepage.workspace = true
+edition = "2024"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+sparklers.workspace = true
+embed_plist = "1.2"

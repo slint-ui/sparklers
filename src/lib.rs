@@ -4,5 +4,4 @@ mod events;
 mod sparkle;
 
 pub use error::{Error, Result};
-
-pub use sparkle::Sparkle;
+pub use sparkle::{Sparkle, SparkleConfig};

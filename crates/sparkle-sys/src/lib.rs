@@ -4,6 +4,21 @@ use objc2::{MainThreadOnly, extern_class, extern_methods};
 use objc2_foundation::{NSDate, NSDictionary, NSError, NSNumber, NSString, NSURL};
 
 extern_class!(
+    /// A controller class that instantiates a `SPUUpdater` and allows binding UI to its updater settings.
+    ///
+    /// This class can be instantiated in a nib or created programmatically using `-initWithUpdaterDelegate:userDriverDelegate:` or `-initWithStartingUpdater:updaterDelegate:userDriverDelegate:`.
+    ///
+    /// The controller’s updater targets the application’s main bundle and uses Sparkle’s standard user interface. Typically, this class is used by sticking it as a custom [`NSObject`] subclass in an Interface Builder nib (probably in MainMenu) but it works well programmatically too.
+    ///
+    /// The controller creates an `SPUUpdater` instance using a `SPUStandardUserDriver` and allows hooking up the check for updates action and handling menu item validation. It also allows hooking up the updater’s and user driver’s delegates.
+    ///
+    /// If you need more control over what bundle you want to update, or you want to provide a custom user interface (via `SPUUserDriver`), please use `SPUUpdater` directly instead.
+    ///
+    /// This class must be used on the main thread.
+    ///
+    /// [Original documentation][original-docs]
+    ///
+    /// [original-docs]: https://sparkle-project.github.io/documentation/api-reference/Classes/SPUStandardUpdaterController.html
     #[unsafe(super(NSObject))]
     #[thread_kind = MainThreadOnly]
     #[name = "SPUStandardUpdaterController"]
@@ -13,6 +28,18 @@ extern_class!(
 
 impl SPUStandardUpdaterController {
     extern_methods!(
+        /// Create a new `SPUStandardUpdaterController` programmatically allowing you to specify
+        /// whether or not to start the updater immediately.
+        ///
+        /// You can specify whether or not you want to start the updater immediately. If you do not
+        /// start the updater, you must invoke -startUpdater at a later time to start it.
+        ///
+        /// Note the `updaterDelegate` and `userDriverDelegate` are weakly referenced, so you are
+        /// responsible for keeping them alive.
+        ///
+        /// [Original documentation][original-docs]
+        ///
+        /// [original-docs]: https://sparkle-project.github.io/documentation/api-reference/Classes/SPUStandardUpdaterController.html#/c:objc(cs)SPUStandardUpdaterController(im)initWithStartingUpdater:updaterDelegate:userDriverDelegate:
         #[unsafe(method(initWithStartingUpdater:updaterDelegate:userDriverDelegate:))]
         pub fn init_with_starting_updater(
             this: objc2::rc::Allocated<Self>,
@@ -21,9 +48,31 @@ impl SPUStandardUpdaterController {
             user_driver_delegate: Option<&NSObject>,
         ) -> Retained<Self>;
 
+        /// Accessible property for the updater. Some properties on the updater can be binded via
+        /// KVO
+        ///
+        /// When instantiated from a nib, don’t perform update checks before the application has
+        /// finished launching in a MainMenu nib (i.e `applicationDidFinishLaunching:`) or before
+        /// the corresponding window/view controller has been loaded (i.e, `windowDidLoad` or
+        /// `viewDidLoad`). The updater is not guaranteed to be started yet before these points.
+        ///
+        /// [Original documentation][original-docs]
+        ///
+        /// [original-docs]: https://sparkle-project.github.io/documentation/api-reference/Classes/SPUStandardUpdaterController.html#/c:objc(cs)SPUStandardUpdaterController(py)updater
         #[unsafe(method(updater))]
         pub fn updater(&self) -> Retained<SPUUpdater>;
 
+        /// Explicitly checks for updates and displays a progress dialog while doing so.
+        ///
+        /// This method is meant for a main menu item. Connect any `NSMenuItem` to this action in Interface Builder or programmatically, and Sparkle will check for updates and report back its findings verbosely when it is invoked.
+        ///
+        /// When the target/action of the menu item is set to this controller and this method, this controller also handles enabling/disabling the menu item by checking `-[SPUUpdater canCheckForUpdates]`
+        ///
+        /// This action checks updates by invoking `-[SPUUpdater checkForUpdates]`
+        ///
+        /// [Original docomentation][original-docs]
+        ///
+        /// [original-docs]: https://sparkle-project.github.io/documentation/api-reference/Classes/SPUStandardUpdaterController.html#/c:objc(cs)SPUStandardUpdaterController(im)checkForUpdates:
         #[unsafe(method(checkForUpdates:))]
         pub fn check_for_updates(&self, sender: Option<&NSObject>);
     );

@@ -37,7 +37,7 @@ Sparkle.framework/
 .envrc
 
 sparkle.tar.xz
-/sparkle-bin
+sparkle-bin
 
 # Sparkle private keys (sensitive!)
 sparkle_private_key.txt
