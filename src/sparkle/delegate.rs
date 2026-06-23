@@ -10,7 +10,6 @@ use objc2_foundation::{NSArray, NSDictionary, NSMutableSet, NSNumber, NSSet, NSS
 use serde::Serialize;
 use serde_json::Value;
 
-use super::bindings::SPUAppcastItem;
 use crate::events::UpdateInfo;
 use crate::events::{
     DownloadFailedInfo, EmptyPayload, ErrorPayload, ScheduleInfo, UpdateCycleInfo, UserChoiceInfo,
@@ -22,6 +21,7 @@ use crate::events::{
     EVENT_WILL_NOT_SCHEDULE_UPDATE_CHECK, EVENT_WILL_RELAUNCH_APPLICATION,
     EVENT_WILL_SCHEDULE_UPDATE_CHECK,
 };
+use sparkle_sys::SPUAppcastItem;
 
 pub type EventEmitter = Arc<dyn Fn(&str, Value) + Send + Sync>;
 pub type EventCallback = Arc<dyn Fn(&str, &Value) + Send + Sync>;

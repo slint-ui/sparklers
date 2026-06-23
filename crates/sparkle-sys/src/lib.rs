@@ -1,6 +1,6 @@
 use objc2::rc::Retained;
 use objc2::runtime::NSObject;
-use objc2::{extern_class, extern_methods, MainThreadOnly};
+use objc2::{MainThreadOnly, extern_class, extern_methods};
 use objc2_foundation::{NSDate, NSDictionary, NSError, NSNumber, NSString, NSURL};
 
 extern_class!(

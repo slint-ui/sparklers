@@ -1,10 +1,10 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-VERSION="2.8.1"
-EXPECTED_SHA256="5cddb7695674ef7704268f38eccaee80e3accbf19e61c1689efff5b6116d85be"
+VERSION="2.9.3"
+EXPECTED_SHA256="74a07da821f92b79310009954c0e15f350173374a3abe39095b4fc5096916be6"
 
-cd "$(pwd "$0")/src-tauri"
+cd "$(git rev-parse --show-toplevel)"
 
 if [ -d "Sparkle.framework" ]; then
     echo "Sparkle.framework already exists"
@@ -12,7 +12,6 @@ if [ -d "Sparkle.framework" ]; then
 fi
 
 TEMP_DIR=$(mktemp -d)
-trap "rm -rf $TEMP_DIR" EXIT
 
 echo "Downloading Sparkle ${VERSION}..."
 curl -L -o "$TEMP_DIR/sparkle.tar.xz" \
@@ -28,8 +27,8 @@ cp -R "$TEMP_DIR/Sparkle.framework" .
 
 # Also copy the bin tools (generate_keys, sign_update)
 if [ -d "$TEMP_DIR/bin" ]; then
-    echo "Copying Sparkle bin tools..."
-    cp -R "$TEMP_DIR/bin" ./sparkle-bin
+    echo "Linking Sparkle bin tools..."
+    ln -s "$TEMP_DIR/bin" ./sparkle-bin
     chmod +x ./sparkle-bin/*
 fi
 

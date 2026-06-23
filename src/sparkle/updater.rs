@@ -1,44 +1,19 @@
 use std::collections::HashMap;
 use std::ptr;
+use std::sync::mpsc::Receiver;
 use std::sync::Arc;
 
-use dispatch::Queue;
+use dispatch2::{run_on_main, MainThreadBound};
 use log::warn;
 use objc2::rc::Retained;
 use objc2::runtime::NSObject;
 use objc2::{msg_send, ClassType, MainThreadMarker};
 use objc2_foundation::{NSBundle, NSDictionary, NSError, NSString, NSURL};
-use tauri::{AppHandle, Emitter, Runtime};
 
-use super::bindings::{SPUStandardUpdaterController, SPUUpdater};
 use super::delegate::{EventCallback, SparkleDelegate};
 use crate::events::UpdateInfo;
 use crate::{Error, Result};
-
-/// Pointer wrapper for cross-thread dispatch. Only dereference on main thread.
-#[repr(transparent)]
-struct SendPtr<T>(*const T);
-
-unsafe impl<T> Send for SendPtr<T> {}
-unsafe impl<T> Sync for SendPtr<T> {}
-
-impl<T> Clone for SendPtr<T> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<T> Copy for SendPtr<T> {}
-
-impl<T> SendPtr<T> {
-    fn new(ptr: *const T) -> Self {
-        SendPtr(ptr)
-    }
-
-    unsafe fn as_ref(&self) -> &T {
-        &*self.0
-    }
-}
+use sparkle_sys::{SPUStandardUpdaterController, SPUUpdater};
 
 fn is_valid_bundle() -> bool {
     unsafe {
@@ -54,26 +29,19 @@ fn is_valid_bundle() -> bool {
     }
 }
 
-/// Returns `None` if running outside a valid macOS bundle (e.g., during `tauri dev`).
-pub fn init<R: Runtime>(app: &AppHandle<R>) -> Result<Option<SparkleUpdater<R>>> {
-    let mtm = MainThreadMarker::new()
-        .ok_or_else(|| Error::SparkleInit("Must be called on main thread".to_string()))?;
-
-    if !is_valid_bundle() {
-        warn!(
-            "Sparkle updater disabled: not running inside a valid macOS bundle. \
-             This is expected during development (tauri dev). \
-             Sparkle will work in release builds (tauri build)."
-        );
-        return Ok(None);
-    }
-
+fn init_on_main_thread(
+    mtm: MainThreadMarker,
+) -> Result<(
+    MainThreadBound<SparkleUpdater>,
+    Receiver<(String, serde_json::Value)>,
+)> {
     check_info_plist_keys();
 
+    let (send, recv) = std::sync::mpsc::channel();
+
     let delegate = SparkleDelegate::new(mtm);
-    let app_clone = app.clone();
     delegate.set_emitter(Arc::new(move |event: &str, payload: serde_json::Value| {
-        if let Err(e) = app_clone.emit(event, payload) {
+        if let Err(e) = send.send((event.to_string(), payload)) {
             log::error!("Failed to emit event {}: {}", event, e);
         }
     }));
@@ -104,16 +72,16 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) -> Result<Option<SparkleUpdater<R>>>
         return Err(Error::SparkleInit("Failed to start updater".to_string()));
     }
 
-    let controller_ptr = SendPtr::new(Retained::as_ptr(&controller));
-    let delegate_ptr = SendPtr::new(Retained::as_ptr(&delegate));
-
-    Ok(Some(SparkleUpdater {
-        app: app.clone(),
-        _controller: controller,
-        controller_ptr,
-        _delegate: delegate,
-        delegate_ptr,
-    }))
+    Ok((
+        MainThreadBound::new(
+            SparkleUpdater {
+                controller,
+                delegate,
+            },
+            mtm,
+        ),
+        recv,
+    ))
 }
 
 const PLIST_KEY_VALIDATIONS: &[(&str, &str)] = &[
@@ -144,36 +112,76 @@ fn check_info_plist_keys() {
     }
 }
 
-pub struct SparkleUpdater<R: Runtime> {
-    #[allow(dead_code)]
-    app: AppHandle<R>,
-    _controller: Retained<SPUStandardUpdaterController>,
-    controller_ptr: SendPtr<SPUStandardUpdaterController>,
-    _delegate: Retained<SparkleDelegate>,
-    delegate_ptr: SendPtr<SparkleDelegate>,
+#[derive(Debug, Clone)]
+pub struct SparkleConfig {
+    pub version: String,
 }
 
-// All operations dispatched to main thread via GCD
-unsafe impl<R: Runtime> Send for SparkleUpdater<R> {}
-unsafe impl<R: Runtime> Sync for SparkleUpdater<R> {}
+pub trait GetSparkleConfig {
+    fn sparkle_config(&self) -> SparkleConfig;
+}
 
-impl<R: Runtime> SparkleUpdater<R> {
+impl<C> GetSparkleConfig for C
+where
+    C: AsRef<SparkleConfig>,
+{
+    fn sparkle_config(&self) -> SparkleConfig {
+        self.as_ref().clone()
+    }
+}
+
+pub struct Sparkle<C = SparkleConfig> {
+    updater: MainThreadBound<SparkleUpdater>,
+    config: C,
+    messages: Receiver<(String, serde_json::Value)>,
+}
+
+impl<C> Sparkle<C>
+where
+    C: Send + 'static,
+{
+    pub fn new(config: C) -> Result<Option<Self>> {
+        if !is_valid_bundle() {
+            warn!(
+                "Sparkle updater disabled: not running inside a valid macOS bundle. \
+             This is expected during development. \
+             Sparkle will work in release builds."
+            );
+            return Ok(None);
+        }
+
+        run_on_main(|mtm| init_on_main_thread(mtm))
+            .map(move |(updater, messages)| Self {
+                config,
+                updater,
+                messages,
+            })
+            .map(Some)
+    }
+}
+
+pub struct SparkleUpdater {
+    controller: Retained<SPUStandardUpdaterController>,
+    delegate: Retained<SparkleDelegate>,
+}
+
+// TODO: Probably unnecessary?
+impl<C> Sparkle<C>
+where
+    C: GetSparkleConfig,
+{
+    pub fn current_version(&self) -> Result<String> {
+        Ok(self.config.sparkle_config().version)
+    }
+}
+
+impl<C> Sparkle<C> {
     fn dispatch<T, F>(&self, f: F) -> T
     where
         T: Send,
         F: FnOnce(&SPUStandardUpdaterController) -> T + Send,
     {
-        let ptr = self.controller_ptr;
-        if MainThreadMarker::new().is_some() {
-            // Already on main thread — call directly to avoid dispatch_sync deadlock
-            let controller = unsafe { ptr.as_ref() };
-            f(controller)
-        } else {
-            Queue::main().exec_sync(move || {
-                let controller = unsafe { ptr.as_ref() };
-                f(controller)
-            })
-        }
+        self.updater.get_on_main(|updater| f(&updater.controller))
     }
 
     fn dispatch_delegate<T, F>(&self, f: F) -> T
@@ -181,17 +189,12 @@ impl<R: Runtime> SparkleUpdater<R> {
         T: Send,
         F: FnOnce(&SparkleDelegate) -> T + Send,
     {
-        let ptr = self.delegate_ptr;
-        if MainThreadMarker::new().is_some() {
-            // Already on main thread — call directly to avoid dispatch_sync deadlock
-            let delegate = unsafe { ptr.as_ref() };
-            f(delegate)
-        } else {
-            Queue::main().exec_sync(move || {
-                let delegate = unsafe { ptr.as_ref() };
-                f(delegate)
-            })
-        }
+        self.updater.get_on_main(|updater| f(&updater.delegate))
+    }
+
+    // TODO: This should probably use `async`
+    pub fn messages(&self) -> impl Iterator<Item = (String, serde_json::Value)> + use<'_, C> {
+        self.messages.try_iter()
     }
 
     pub fn check_for_updates(&self) -> Result<()> {
@@ -206,10 +209,6 @@ impl<R: Runtime> SparkleUpdater<R> {
 
     pub fn can_check_for_updates(&self) -> Result<bool> {
         Ok(self.dispatch(|c| c.updater().can_check_for_updates()))
-    }
-
-    pub fn current_version(&self) -> Result<String> {
-        Ok(self.app.package_info().version.to_string())
     }
 
     pub fn feed_url(&self) -> Result<Option<String>> {
