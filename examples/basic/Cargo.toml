@@ -9,5 +9,7 @@ homepage.workspace = true
 edition = "2024"
 
 [target.'cfg(target_os = "macos")'.dependencies]
+objc2-foundation.workspace = true
 sparklers.workspace = true
+dispatch2.workspace = true
 embed_plist = "1.2"

@@ -26,5 +26,7 @@
 	<string>12.0</string>
     <key>SUPublicEDKey</key>
     <string>IfbmMbVN3sKz+bUDIEExtwKlrNLlUgP2PDR3ygoIGec=</string>
+    <key>SUFeedURL</key>
+    <string>https://visual-editor.slint.dev/</string>
 </dict>
 </plist>

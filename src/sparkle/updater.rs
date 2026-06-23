@@ -17,8 +17,8 @@ use crate::{Error, Result};
 
 fn is_valid_bundle() -> bool {
     unsafe {
-        let bundle = dbg!(NSBundle::mainBundle());
-        let identifier: Option<Retained<NSString>> = dbg!(msg_send![&bundle, bundleIdentifier]);
+        let bundle = NSBundle::mainBundle();
+        let identifier: Option<Retained<NSString>> = msg_send![&bundle, bundleIdentifier];
         match identifier {
             Some(id) => {
                 let id_str = id.to_string();
