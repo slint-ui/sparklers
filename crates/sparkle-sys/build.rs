@@ -1,5 +1,3 @@
-use std::path::Path;
-
 // TODO: Is this necessary?
 // const COMMANDS: &[&str] = &[
 //     "check_for_updates",
@@ -45,75 +43,11 @@ use std::path::Path;
 //     "last_found_update",
 // ];
 
+use sparkle_find_framework::{is_publish_verify, setup_sparkle_framework};
+
 fn main() {
     if std::env::var("CARGO_CFG_TARGET_OS").ok().as_deref() == Some("macos") && !is_publish_verify()
     {
         setup_sparkle_framework();
     }
-}
-
-fn is_publish_verify() -> bool {
-    if std::env::var("DOCS_RS").is_ok() {
-        return true;
-    }
-
-    if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
-        if manifest_dir.contains("target/package/") {
-            return true;
-        }
-    }
-
-    false
-}
-
-fn setup_sparkle_framework() {
-    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-    let mut search_paths: Vec<String> = Vec::new();
-
-    if let Ok(path) = std::env::var("SPARKLE_FRAMEWORK_PATH") {
-        search_paths.push(path);
-    }
-
-    search_paths.push(manifest_dir.clone());
-
-    let mut framework_dir = None;
-
-    for search_path in &search_paths {
-        if search_path.is_empty() {
-            continue;
-        }
-        let path = Path::new(search_path);
-        let framework_path = path.join("Sparkle.framework");
-
-        if framework_path.exists() {
-            println!("cargo::warning=Found framework at {framework_path:?}");
-            framework_dir = Some(search_path.clone());
-            break;
-        }
-    }
-
-    let repo = git2::Repository::discover(manifest_dir).unwrap();
-    let ref_head = repo.find_reference("HEAD").unwrap();
-    let commit = ref_head.peel_to_commit().unwrap().id();
-
-    let framework_dir = framework_dir.unwrap_or_else(|| {
-        println!("cargo::warning=Searched paths: {:?}", search_paths);
-        panic!(
-            "\n\
-            Sparkle.framework not found!\n\
-            \n\
-            Please download Sparkle framework by running:\n\
-            \n\
-            curl -fsSL https://raw.githubusercontent.com/slint-ui/sparklers/{commit}/scripts/download-sparkle.sh | bash\n\
-            \n\
-            Or set the SPARKLE_FRAMEWORK_PATH environment variable to the directory containing Sparkle.framework.\n"
-        )
-    });
-
-    println!("cargo:rustc-link-search=framework={framework_dir}");
-    println!("cargo:rustc-link-lib=framework=Sparkle");
-    println!("cargo:rustc-link-lib=framework=AppKit");
-    println!("cargo:rustc-link-lib=framework=Foundation");
-    println!("cargo:rustc-link-arg=-Wl,-rpath,{framework_dir}");
-    println!("cargo:rerun-if-env-changed=SPARKLE_FRAMEWORK_PATH");
 }

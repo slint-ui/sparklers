@@ -1,0 +1,12 @@
+[package]
+name = "sparkle-find-framework"
+version.workspace = true
+description = "Build script helpers for `sparklers`"
+authors.workspace = true
+license = "MIT"
+repository.workspace = true
+homepage.workspace = true
+edition = "2024"
+
+[dependencies]
+git2 = "0.21"

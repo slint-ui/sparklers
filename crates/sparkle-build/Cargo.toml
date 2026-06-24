@@ -1,17 +1,12 @@
 [package]
-name = "sparkle-sys"
+name = "sparkle-build"
 version.workspace = true
-description = "Low-level bindings to the Sparkle application update framework for macOS"
+description = "Build script helpers for `sparklers`"
 authors.workspace = true
 license = "MIT"
 repository.workspace = true
 homepage.workspace = true
 edition = "2024"
-links = "Sparkle.framework"
 
 [build-dependencies]
 sparkle-find-framework = { path = "../sparkle-find-framework", version = "0.1" }
-
-[target.'cfg(target_os = "macos")'.dependencies]
-objc2.workspace = true
-objc2-foundation.workspace = true

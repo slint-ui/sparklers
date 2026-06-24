@@ -1,103 +1,223 @@
-use serde::Serialize;
+use std::ops::Deref;
 
-pub const EVENT_DID_FINISH_LOADING_APPCAST: &str = "sparkle://did-finish-loading-appcast";
-pub const EVENT_DID_FIND_VALID_UPDATE: &str = "sparkle://did-find-valid-update";
-pub const EVENT_DID_NOT_FIND_UPDATE: &str = "sparkle://did-not-find-update";
-pub const EVENT_WILL_DOWNLOAD_UPDATE: &str = "sparkle://will-download-update";
-pub const EVENT_DID_DOWNLOAD_UPDATE: &str = "sparkle://did-download-update";
-pub const EVENT_WILL_INSTALL_UPDATE: &str = "sparkle://will-install-update";
-pub const EVENT_DID_ABORT_WITH_ERROR: &str = "sparkle://did-abort-with-error";
-pub const EVENT_DID_FINISH_UPDATE_CYCLE: &str = "sparkle://did-finish-update-cycle";
-pub const EVENT_FAILED_TO_DOWNLOAD_UPDATE: &str = "sparkle://failed-to-download-update";
-pub const EVENT_USER_DID_CANCEL_DOWNLOAD: &str = "sparkle://user-did-cancel-download";
-pub const EVENT_WILL_EXTRACT_UPDATE: &str = "sparkle://will-extract-update";
-pub const EVENT_DID_EXTRACT_UPDATE: &str = "sparkle://did-extract-update";
-pub const EVENT_WILL_RELAUNCH_APPLICATION: &str = "sparkle://will-relaunch-application";
-pub const EVENT_USER_DID_MAKE_CHOICE: &str = "sparkle://user-did-make-choice";
-pub const EVENT_WILL_SCHEDULE_UPDATE_CHECK: &str = "sparkle://will-schedule-update-check";
-pub const EVENT_WILL_NOT_SCHEDULE_UPDATE_CHECK: &str = "sparkle://will-not-schedule-update-check";
-pub const EVENT_WILL_INSTALL_UPDATE_ON_QUIT: &str = "sparkle://will-install-update-on-quit";
+use objc2::{msg_send, rc::Retained};
+use objc2_foundation::{NSError, NSMutableURLRequest, NSNumber, NSString, NSURL};
+use sparkle_sys::SUAppcastItem;
 
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UpdateInfo {
-    pub version: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub release_notes: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub release_notes_url: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub info_url: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub minimum_system_version: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub channel: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub date: Option<f64>,
-    pub is_critical: bool,
-    pub is_major_upgrade: bool,
-    pub is_information_only: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub maximum_system_version: Option<String>,
-    pub minimum_os_version_ok: bool,
-    pub maximum_os_version_ok: bool,
-    pub installation_type: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub phased_rollout_interval: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub full_release_notes_url: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub minimum_autoupdate_version: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub ignore_skipped_upgrades_below_version: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub date_string: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub item_description_format: Option<String>,
+#[derive(Debug, Copy, Clone)]
+pub struct AppcastItemRef<'a> {
+    inner: &'a SUAppcastItem,
 }
 
-#[derive(Clone, Debug, Serialize)]
-pub struct VersionInfo {
-    pub version: String,
+impl<'a> From<&'a SUAppcastItem> for AppcastItemRef<'a> {
+    fn from(value: &'a SUAppcastItem) -> Self {
+        Self { inner: value }
+    }
 }
 
-#[derive(Clone, Debug, Serialize)]
-pub struct ErrorPayload {
-    pub message: String,
-    pub code: i64,
-    pub domain: String,
+fn url_to_string(url: &NSURL) -> String {
+    let abs: Option<Retained<NSString>> = unsafe { msg_send![url, absoluteString] };
+    abs.map(|s| s.to_string()).unwrap_or_default()
 }
 
-#[derive(Clone, Debug, Serialize)]
-pub struct EmptyPayload {}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UpdateCycleInfo {
-    pub update_check: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<ErrorPayload>,
+fn number_to_f64(num: &NSNumber) -> f64 {
+    unsafe { msg_send![num, doubleValue] }
 }
 
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DownloadFailedInfo {
-    pub version: String,
-    pub error: ErrorPayload,
+impl AppcastItemRef<'_> {
+    pub fn version(&self) -> String {
+        self.inner.display_version_string().to_string()
+    }
+
+    pub fn release_notes(&self) -> Option<String> {
+        self.inner.item_description().map(|s| s.to_string())
+    }
+
+    pub fn title(&self) -> Option<String> {
+        self.inner.title().map(|s| s.to_string())
+    }
+
+    pub fn release_notes_url(&self) -> Option<String> {
+        self.inner.release_notes_url().map(|u| url_to_string(&u))
+    }
+
+    pub fn info_url(&self) -> Option<String> {
+        self.inner.info_url().map(|u| url_to_string(&u))
+    }
+
+    pub fn minimum_system_version(&self) -> Option<String> {
+        self.inner.minimum_system_version().map(|s| s.to_string())
+    }
+
+    pub fn channel(&self) -> Option<String> {
+        self.inner.channel().map(|s| s.to_string())
+    }
+
+    pub fn date(&self) -> Option<f64> {
+        self.inner.date().map(|d| {
+            let seconds: f64 = unsafe { msg_send![&d, timeIntervalSince1970] };
+
+            seconds * 1000.0
+        })
+    }
+
+    pub fn is_critical(&self) -> bool {
+        self.inner.is_critical_update()
+    }
+
+    pub fn is_major_upgrade(&self) -> bool {
+        self.inner.is_major_upgrade()
+    }
+
+    pub fn is_information_only(&self) -> bool {
+        self.inner.is_information_only_update()
+    }
+
+    pub fn maximum_system_version(&self) -> Option<String> {
+        self.inner.maximum_system_version().map(|s| s.to_string())
+    }
+
+    pub fn minimum_os_version_ok(&self) -> bool {
+        self.inner.minimum_operating_system_version_is_ok()
+    }
+
+    pub fn maximum_os_version_ok(&self) -> bool {
+        self.inner.maximum_operating_system_version_is_ok()
+    }
+
+    pub fn installation_type(&self) -> String {
+        self.inner.installation_type().to_string()
+    }
+
+    pub fn phased_rollout_interval(&self) -> Option<f64> {
+        self.inner.phased_rollout_interval().map(|n| number_to_f64(&n))
+    }
+
+    pub fn full_release_notes_url(&self) -> Option<String> {
+        self.inner.full_release_notes_url().map(|u| url_to_string(&u))
+    }
+
+    pub fn minimum_autoupdate_version(&self) -> Option<String> {
+        self.inner.minimum_autoupdate_version().map(|s| s.to_string())
+    }
+
+    pub fn ignore_skipped_upgrades_below_version(&self) -> Option<String> {
+        self.inner.ignore_skipped_upgrades_below_version().map(|s| s.to_string())
+    }
+
+    pub fn date_string(&self) -> Option<String> {
+        self.inner.date_string().map(|s| s.to_string())
+    }
+
+    pub fn item_description_format(&self) -> Option<String> {
+        self.inner.item_description_format().map(|s| s.to_string())
+    }
 }
 
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UserChoiceInfo {
-    pub choice: String,
-    pub version: String,
-    pub stage: String,
+impl Deref for AppcastItemRef<'_> {
+    type Target = SUAppcastItem;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
 }
 
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ScheduleInfo {
-    pub delay: f64,
+#[derive(Debug, Copy, Clone)]
+pub struct SparkleErrorRef<'a> {
+    inner: &'a NSError,
+}
+
+impl SparkleErrorRef<'_> {
+    pub fn message(&self) -> String {
+        self.inner.localizedDescription().to_string()
+    }
+
+    pub fn code(&self) -> isize {
+        self.inner.code()
+    }
+
+    pub fn domain(&self) -> String {
+        self.inner.domain().to_string()
+    }
+}
+
+impl<'a> From<&'a NSError> for SparkleErrorRef<'a> {
+    fn from(value: &'a NSError) -> Self {
+        Self { inner: value }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum UpdateCheckKind {
+    UserInitiated,
+    Background,
+    Other,
+}
+
+impl From<isize> for UpdateCheckKind {
+    fn from(value: isize) -> Self {
+        match value {
+            0 => Self::UserInitiated,
+            1 => Self::Background,
+            _ => Self::Other,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum UserChoice {
+    Skip,
+    Install,
+    Dismiss,
+}
+
+impl From<isize> for UserChoice {
+    fn from(value: isize) -> Self {
+        match value {
+            0 => Self::Skip,
+            1 => Self::Install,
+            // TODO: Is a glob match correct here? That's what the Tauri plugin did.
+            _ => Self::Dismiss,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum UserChoiceState {
+    NotDownloaded,
+    Downloaded,
+    Installing,
+}
+
+impl From<isize> for UserChoiceState {
+    fn from(value: isize) -> Self {
+        match value {
+            0 => Self::NotDownloaded,
+            1 => Self::Downloaded,
+            // TODO: Is a glob match correct here? That's what the Tauri plugin did.
+            _ => Self::Installing,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum NotificationKind<'a> {
+    DidFindValidUpdate { item: AppcastItemRef<'a> },
+    DidFinishLoadingAppCast,
+    DidNotFindUpdate,
+    WillRestart,
+    WillDownloadUpdate { item: AppcastItemRef<'a>, request: &'a NSMutableURLRequest },
+    DidDownloadUpdate { item: AppcastItemRef<'a> },
+    WillInstallUpdate { item: AppcastItemRef<'a> },
+    DidAbortWithError { error: SparkleErrorRef<'a> },
+    DidFinishUpdateCycle { kind: UpdateCheckKind, error: Option<SparkleErrorRef<'a>> },
+    FailedToDownloadUpdate { item: AppcastItemRef<'a>, error: SparkleErrorRef<'a> },
+    UserDidCancelDownload,
+    WillExtractUpdate { item: AppcastItemRef<'a> },
+    DidExtractUpdate { item: AppcastItemRef<'a> },
+    WillRelaunchApplication,
+    UserDidMakeChoice { item: AppcastItemRef<'a>, choice: UserChoice, state: UserChoiceState },
+    WillScheduleUpdateCheck { delay_secs: f64 },
+    WillNotScheduleUpdateCheck,
+    WillInstallUpdateOnQuit { item: AppcastItemRef<'a> },
 }
