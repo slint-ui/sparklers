@@ -20,7 +20,8 @@ pub fn is_publish_verify() -> bool {
 /// Traverse up to the workspace root. Panics if no `[workspace]` is found in any Cargo.toml files.
 fn workspace_dir() -> PathBuf {
     let crate_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
-    let mut dir = Some(Path::new(&crate_dir));
+    let root = Path::new(&crate_dir);
+    let mut dir = Some(root);
     while let Some(current) = dir {
         let toml_path = current.join("Cargo.toml");
         if toml_path.exists() {
@@ -33,10 +34,7 @@ fn workspace_dir() -> PathBuf {
         dir = current.parent();
     }
 
-    panic!(
-        "Failed to find workspace root starting from {:?}; no Cargo.toml with [workspace] found.",
-        &crate_dir
-    );
+    root.into()
 }
 
 pub fn find_sparkle_framework() -> PathBuf {
