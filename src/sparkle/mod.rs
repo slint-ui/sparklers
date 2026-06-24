@@ -10,9 +10,9 @@ use objc2::rc::Retained;
 use objc2::runtime::NSObject;
 use objc2::{msg_send, ClassType, MainThreadMarker};
 use objc2_foundation::{NSBundle, NSDictionary, NSError, NSString, NSURL};
-use sparkle_sys::updater::{SPUStandardUpdaterController, SPUUpdater};
+use sparklers_sys::updater::{SPUStandardUpdaterController, SPUUpdater};
 
-use crate::{Error, NotificationKind, Result};
+use crate::{Error, Event, Result};
 use delegate::SparkleDelegate;
 
 fn is_valid_bundle() -> bool {
@@ -395,10 +395,7 @@ impl<C> Sparkle<C> {
         Ok(())
     }
 
-    pub fn set_event_callback(
-        &self,
-        callback: impl Fn(NotificationKind<'_>) + Send + Sync + 'static,
-    ) {
+    pub fn set_event_callback(&self, callback: impl Fn(Event<'_>) + Send + Sync + 'static) {
         self.dispatch_delegate(|d| d.set_event_callback(Arc::new(callback)))
     }
 

@@ -14,7 +14,7 @@ edition = "2021"
 rust-version = "1.77.2"
 
 [workspace]
-members = ["crates/sparkle-sys", "crates/sparkle-build", "crates/sparkle-find-framework", "examples/basic"]
+members = ["crates/sparklers-sys", "crates/sparklers-build", "crates/sparklers-find-framework", "examples/basic"]
 
 [workspace.package]
 version = "0.1.0"
@@ -28,18 +28,15 @@ objc2-foundation = { version = "0.3", features = ["NSDate", "NSDictionary", "NSU
 objc2-app-kit = { version = "0.3", features = ["NSApplication"] }
 dispatch2 = "0.3"
 sparklers = { path = ".", version = "0.1.0" }
-sparkle-build = { path = "crates/sparkle-build", version = "0.1.0" }
+sparklers-build = { path = "crates/sparklers-build", version = "0.1.0" }
 
 [dependencies]
 thiserror = "2"
 url = "2"
 log = "0.4"
 
-[dev-dependencies]
-serde_json = "1"
-
 [target.'cfg(target_os = "macos")'.dependencies]
-sparkle-sys = { path = "crates/sparkle-sys", version = "0.1.0" }
+sparklers-sys = { path = "crates/sparklers-sys", version = "0.1.0" }
 objc2.workspace = true
 objc2-foundation.workspace = true
 objc2-app-kit.workspace = true

@@ -1,5 +1,5 @@
 [package]
-name = "sparkle-find-framework"
+name = "sparklers-find-framework"
 version.workspace = true
 description = "Build script helpers for `sparklers`"
 authors.workspace = true

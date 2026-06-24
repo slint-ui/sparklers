@@ -1,5 +1,5 @@
 [package]
-name = "sparkle-build"
+name = "sparklers-build"
 version.workspace = true
 description = "Build script helpers for `sparklers`"
 authors.workspace = true
@@ -9,4 +9,4 @@ homepage.workspace = true
 edition = "2024"
 
 [build-dependencies]
-sparkle-find-framework = { path = "../sparkle-find-framework", version = "0.1" }
+sparklers-find-framework = { path = "../sparklers-find-framework", version = "0.1" }

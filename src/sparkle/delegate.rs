@@ -8,11 +8,11 @@ use objc2::{define_class, msg_send, DeclaredClass, MainThreadMarker, MainThreadO
 use objc2_foundation::{
     NSArray, NSDictionary, NSError, NSMutableSet, NSMutableURLRequest, NSSet, NSString,
 };
-use sparkle_sys::SUAppcastItem;
+use sparklers_sys::SUAppcastItem;
 
-use crate::events::{NotificationKind, SparkleErrorRef};
+use crate::events::{Event, SparkleErrorRef};
 
-pub type EventCallback = Arc<dyn Fn(NotificationKind<'_>) + Send + Sync>;
+pub type EventCallback = Arc<dyn Fn(Event<'_>) + Send + Sync>;
 
 pub struct DelegateIvars {
     event_callback: RefCell<EventCallback>,
@@ -41,7 +41,7 @@ define_class!(
             _updater: &NSObject,
             _appcast: &NSObject,
         ) {
-            self.emit(NotificationKind::DidFinishLoadingAppCast);
+            self.emit(Event::DidFinishLoadingAppCast);
         }
 
         #[unsafe(method(updater:didFindValidUpdate:))]
@@ -52,12 +52,12 @@ define_class!(
         ) {
             // TODO: Reimplement this
             // *self.ivars().last_found_update.borrow_mut() = Some(update_info.clone());
-            self.emit(NotificationKind::DidFindValidUpdate { item: item.into() });
+            self.emit(Event::DidFindValidUpdate { item: item.into() });
         }
 
         #[unsafe(method(updaterDidNotFindUpdate:))]
         fn updater_did_not_find_update(&self, _updater: &NSObject) {
-            self.emit(NotificationKind::DidNotFindUpdate);
+            self.emit(Event::DidNotFindUpdate);
         }
 
         #[unsafe(method(updater:willDownloadUpdate:withRequest:))]
@@ -76,7 +76,7 @@ define_class!(
                 }
             }
 
-            self.emit(NotificationKind::WillDownloadUpdate {
+            self.emit(Event::WillDownloadUpdate {
                 item: item.into(),
                 request,
             });
@@ -88,7 +88,7 @@ define_class!(
             _updater: &NSObject,
             item: &SUAppcastItem,
         ) {
-        self.emit(NotificationKind::DidDownloadUpdate { item: item.into() });
+        self.emit(Event::DidDownloadUpdate { item: item.into() });
         }
 
         #[unsafe(method(updater:willInstallUpdate:))]
@@ -97,7 +97,7 @@ define_class!(
             _updater: &NSObject,
             item: &SUAppcastItem,
         ) {
-            self.emit(NotificationKind::WillInstallUpdate{item:item.into() });
+            self.emit(Event::WillInstallUpdate{item:item.into() });
         }
 
         #[unsafe(method(updater:didAbortWithError:))]
@@ -106,7 +106,7 @@ define_class!(
             _updater: &NSObject,
             ns_error: &NSError,
         ) {
-            self.emit(NotificationKind::DidAbortWithError{error: ns_error.into() });
+            self.emit(Event::DidAbortWithError{error: ns_error.into() });
         }
 
         #[unsafe(method(updater:didFinishUpdateCycleForUpdateCheck:error:))]
@@ -116,7 +116,7 @@ define_class!(
             update_check: isize,
             error: Option<&NSError>,
         ) {
-            self.emit(NotificationKind::DidFinishUpdateCycle{
+            self.emit(Event::DidFinishUpdateCycle{
                kind: update_check.into(),
                 error: error.map(SparkleErrorRef::from),
             });
@@ -129,7 +129,7 @@ define_class!(
             item: &SUAppcastItem,
             ns_error: &NSError,
         ) {
-            self.emit(NotificationKind::FailedToDownloadUpdate{
+            self.emit(Event::FailedToDownloadUpdate{
                 item: item.into(),
                 error: ns_error.into(),
             });
@@ -137,22 +137,22 @@ define_class!(
 
         #[unsafe(method(userDidCancelDownload:))]
         fn user_did_cancel_download(&self, _updater: &NSObject) {
-            self.emit(NotificationKind::UserDidCancelDownload);
+            self.emit(Event::UserDidCancelDownload);
         }
 
         #[unsafe(method(updater:willExtractUpdate:))]
         fn updater_will_extract_update(&self, _updater: &NSObject, item: &SUAppcastItem) {
-            self.emit(NotificationKind::WillExtractUpdate { item: item.into() });
+            self.emit(Event::WillExtractUpdate { item: item.into() });
         }
 
         #[unsafe(method(updater:didExtractUpdate:))]
         fn updater_did_extract_update(&self, _updater: &NSObject, item: &SUAppcastItem) {
-            self.emit(NotificationKind::DidExtractUpdate { item: item.into() });
+            self.emit(Event::DidExtractUpdate { item: item.into() });
         }
 
         #[unsafe(method(updaterWillRelaunchApplication:))]
         fn updater_will_relaunch_application(&self, _updater: &NSObject) {
-            self.emit(NotificationKind::WillRelaunchApplication);
+            self.emit(Event::WillRelaunchApplication);
         }
 
         #[unsafe(method(updater:userDidMakeChoice:forUpdate:state:))]
@@ -163,7 +163,7 @@ define_class!(
             item: &SUAppcastItem,
             state: isize,
         ) {
-            self.emit(NotificationKind::UserDidMakeChoice{
+            self.emit(Event::UserDidMakeChoice{
                 item: item.into(),
                 choice: choice.into(),
                 state: state.into(),
@@ -172,12 +172,12 @@ define_class!(
 
         #[unsafe(method(updater:willScheduleUpdateCheckAfterDelay:))]
         fn updater_will_schedule_update_check(&self, _updater: &NSObject, delay_secs: f64) {
-            self.emit(NotificationKind::WillScheduleUpdateCheck { delay_secs });
+            self.emit(Event::WillScheduleUpdateCheck { delay_secs });
         }
 
         #[unsafe(method(updaterWillNotScheduleUpdateCheck:))]
         fn updater_will_not_schedule_update_check(&self, _updater: &NSObject) {
-            self.emit(NotificationKind::WillNotScheduleUpdateCheck);
+            self.emit(Event::WillNotScheduleUpdateCheck);
         }
 
         #[unsafe(method(updaterShouldPromptForPermissionToCheckForUpdates:))]
@@ -192,7 +192,7 @@ define_class!(
             item: &SUAppcastItem,
             _handler: &NSObject,
         ) -> bool {
-            self.emit(NotificationKind::WillInstallUpdateOnQuit {
+            self.emit(Event::WillInstallUpdateOnQuit {
                 item: item.into(),
             });
 
@@ -335,7 +335,7 @@ impl SparkleDelegate {
         *self.ivars().event_callback.borrow_mut() = callback;
     }
 
-    fn emit(&self, event: NotificationKind) {
+    fn emit(&self, event: Event) {
         (self.ivars().event_callback.borrow())(event)
     }
 

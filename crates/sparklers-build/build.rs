@@ -1,4 +1,4 @@
-use sparkle_find_framework::find_sparkle_framework;
+use sparklers_find_framework::find_sparkle_framework;
 
 fn main() {
     let framework_dir = find_sparkle_framework();

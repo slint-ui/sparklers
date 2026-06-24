@@ -1,5 +1,5 @@
 use objc2_foundation::{NSDate, NSRunLoop};
-use sparklers::{NotificationKind, Sparkle, SparkleConfig};
+use sparklers::{Event, Sparkle, SparkleConfig};
 
 embed_plist::embed_info_plist!(concat!(env!("CARGO_MANIFEST_DIR"), "/Info.plist"));
 
@@ -15,7 +15,7 @@ fn main() {
 
     update.set_event_callback(|event| {
         dbg!(&event);
-        if let NotificationKind::DidFindValidUpdate { item } = event {
+        if let Event::DidFindValidUpdate { item } = event {
             dbg!(item.file_url());
         }
     });

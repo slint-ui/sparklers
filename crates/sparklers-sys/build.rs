@@ -43,7 +43,7 @@
 //     "last_found_update",
 // ];
 
-use sparkle_find_framework::{is_publish_verify, setup_sparkle_framework};
+use sparklers_find_framework::{is_publish_verify, setup_sparkle_framework};
 
 fn main() {
     if std::env::var("CARGO_CFG_TARGET_OS").ok().as_deref() == Some("macos") && !is_publish_verify()

@@ -1,3 +1,3 @@
 fn main() {
-    sparkle_build::emit_rpath();
+    sparklers_build::emit_rpath();
 }

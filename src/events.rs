@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use objc2::{msg_send, rc::Retained};
 use objc2_foundation::{NSError, NSMutableURLRequest, NSNumber, NSString, NSURL};
-use sparkle_sys::SUAppcastItem;
+use sparklers_sys::SUAppcastItem;
 
 #[derive(Debug, Copy, Clone)]
 pub struct AppcastItemRef<'a> {
@@ -201,7 +201,7 @@ impl From<isize> for UserChoiceState {
 }
 
 #[derive(Debug, Clone)]
-pub enum NotificationKind<'a> {
+pub enum Event<'a> {
     DidFindValidUpdate { item: AppcastItemRef<'a> },
     DidFinishLoadingAppCast,
     DidNotFindUpdate,
