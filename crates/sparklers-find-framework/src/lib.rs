@@ -71,7 +71,7 @@ pub fn find_sparkle_framework() -> PathBuf {
             \n\
             curl -fsSL https://raw.githubusercontent.com/slint-ui/sparklers/refs/heads/master/scripts/download-sparkle.sh | bash\n\
             \n\
-            Or set the SPARKLE_FRAMEWORK_PATH environment variable to the directory containing Sparkle.framework.\n"
+            Or set the SPARKLE_FRAMEWORK_DIR environment variable to the directory containing Sparkle.framework.\n"
         )
     })
 }
@@ -86,5 +86,5 @@ pub fn setup_sparkle_framework() {
     println!("cargo::rustc-link-lib=framework=AppKit");
     println!("cargo::rustc-link-lib=framework=Foundation");
     println!("cargo::rustc-link-arg=-Wl,-rpath,{framework_dir}");
-    println!("cargo::rerun-if-env-changed=SPARKLE_FRAMEWORK_PATH");
+    println!("cargo::rerun-if-env-changed=SPARKLE_FRAMEWORK_DIR");
 }
