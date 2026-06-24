@@ -7,6 +7,3 @@ license = "MIT"
 repository.workspace = true
 homepage.workspace = true
 edition = "2024"
-
-[dependencies]
-git2 = "0.21"

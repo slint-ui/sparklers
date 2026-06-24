@@ -60,19 +60,16 @@ pub fn find_sparkle_framework() -> PathBuf {
         }
     }
 
-    let repo = git2::Repository::discover(manifest_dir).unwrap();
-    let ref_head = repo.find_reference("HEAD").unwrap();
-    let commit = ref_head.peel_to_commit().unwrap().id();
-
     framework_dir.unwrap_or_else(|| {
         println!("cargo::warning=Searched paths: {:?}", search_paths);
+        // TODO: We should point to the ref in the repo corresponding to the current version (probably using tags)
         panic!(
             "\n\
             Sparkle.framework not found!\n\
             \n\
             Please download Sparkle framework by running:\n\
             \n\
-            curl -fsSL https://raw.githubusercontent.com/slint-ui/sparklers/{commit}/scripts/download-sparkle.sh | bash\n\
+            curl -fsSL https://raw.githubusercontent.com/slint-ui/sparklers/refs/heads/master/scripts/download-sparkle.sh | bash\n\
             \n\
             Or set the SPARKLE_FRAMEWORK_PATH environment variable to the directory containing Sparkle.framework.\n"
         )
