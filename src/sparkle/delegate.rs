@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use objc2::rc::Retained;
 use objc2::runtime::NSObject;
@@ -12,19 +11,19 @@ use sparklers_sys::SUAppcastItem;
 
 use crate::events::{Event, SparkleErrorRef};
 
-pub type EventCallback = Arc<dyn Fn(Event<'_>) + Send + Sync>;
+pub type EventCallback = Box<dyn Fn(Event<'_>)>;
 
 pub struct DelegateIvars {
     event_callback: RefCell<EventCallback>,
     allowed_channels: RefCell<Option<Vec<String>>>,
     feed_url_override: RefCell<Option<String>>,
-    feed_parameters: RefCell<Option<HashMap<String, String>>>,
+    feed_parameters: RefCell<HashMap<String, String>>,
     should_download_release_notes: RefCell<bool>,
     should_relaunch: RefCell<bool>,
     may_check_for_updates: RefCell<bool>,
     should_proceed_with_update: RefCell<bool>,
     decryption_password: RefCell<Option<String>>,
-    download_request_headers: RefCell<Option<HashMap<String, String>>>,
+    download_request_headers: RefCell<HashMap<String, String>>,
 }
 
 define_class!(
@@ -67,13 +66,11 @@ define_class!(
             item: &SUAppcastItem,
             request: &NSMutableURLRequest,
         ) {
-            if let Some(ref headers) = *self.ivars().download_request_headers.borrow() {
-                for (key, value) in headers {
-                    let ns_value = NSString::from_str(value);
-                    let ns_field = NSString::from_str(key);
-                    let _: () =
-                        unsafe { msg_send![request, setValue: &*ns_value, forHTTPHeaderField: &*ns_field] };
-                }
+            for (key, value) in self.ivars().download_request_headers.borrow().iter() {
+                let ns_value = NSString::from_str(value);
+                let ns_field = NSString::from_str(key);
+
+                request.setValue_forHTTPHeaderField(Some(&ns_value), &ns_field);
             }
 
             self.emit(Event::WillDownloadUpdate {
@@ -240,10 +237,12 @@ define_class!(
             _sending_profile: bool,
         ) -> *mut NSArray<NSDictionary<NSString, NSString>> {
             let params = self.ivars().feed_parameters.borrow();
-            let array = match params.as_ref() {
-                Some(p) if !p.is_empty() => {
+            let array =
+                if params.is_empty() {
+                    NSArray::new()
+                } else {
                     let mut dicts: Vec<Retained<NSDictionary<NSString, NSString>>> = Vec::new();
-                    for (key, value) in p {
+                    for (key, value) in params.iter() {
                         let key_str = NSString::from_str("key");
                         let value_str = NSString::from_str("value");
                         let k = NSString::from_str(key);
@@ -257,9 +256,7 @@ define_class!(
                     let refs: Vec<&NSDictionary<NSString, NSString>> =
                         dicts.iter().map(|d| d.as_ref()).collect();
                     NSArray::from_slice(&refs)
-                }
-                _ => NSArray::new(),
-            };
+                };
             Retained::autorelease_return(array)
         }
 
@@ -316,17 +313,17 @@ impl SparkleDelegate {
     pub fn new(mtm: MainThreadMarker) -> Retained<Self> {
         let this = Self::alloc(mtm);
         let this = this.set_ivars(DelegateIvars {
-            event_callback: RefCell::new(Arc::new(|_| {})),
+            event_callback: RefCell::new(Box::new(|_| {})),
             allowed_channels: RefCell::new(None),
             feed_url_override: RefCell::new(None),
-            feed_parameters: RefCell::new(None),
+            feed_parameters: Default::default(),
             should_download_release_notes: RefCell::new(true),
             should_relaunch: RefCell::new(true),
             may_check_for_updates: RefCell::new(true),
             should_proceed_with_update: RefCell::new(true),
             decryption_password: RefCell::new(None),
             // last_found_update: RefCell::new(None),
-            download_request_headers: RefCell::new(None),
+            download_request_headers: Default::default(),
         });
         unsafe { msg_send![super(this), init] }
     }
@@ -355,11 +352,11 @@ impl SparkleDelegate {
         *self.ivars().feed_url_override.borrow_mut() = url;
     }
 
-    pub fn feed_parameters(&self) -> Option<HashMap<String, String>> {
+    pub fn feed_parameters(&self) -> HashMap<String, String> {
         self.ivars().feed_parameters.borrow().clone()
     }
 
-    pub fn set_feed_parameters(&self, params: Option<HashMap<String, String>>) {
+    pub fn set_feed_parameters(&self, params: HashMap<String, String>) {
         *self.ivars().feed_parameters.borrow_mut() = params;
     }
 
@@ -403,11 +400,11 @@ impl SparkleDelegate {
         *self.ivars().decryption_password.borrow_mut() = password;
     }
 
-    pub fn download_request_headers(&self) -> Option<HashMap<String, String>> {
+    pub fn download_request_headers(&self) -> HashMap<String, String> {
         self.ivars().download_request_headers.borrow().clone()
     }
 
-    pub fn set_download_request_headers(&self, headers: Option<HashMap<String, String>>) {
+    pub fn set_download_request_headers(&self, headers: HashMap<String, String>) {
         *self.ivars().download_request_headers.borrow_mut() = headers;
     }
 }

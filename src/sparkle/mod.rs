@@ -2,7 +2,6 @@ mod delegate;
 
 use std::collections::HashMap;
 use std::ptr;
-use std::sync::Arc;
 
 use dispatch2::{run_on_main, MainThreadBound};
 use log::warn;
@@ -318,63 +317,57 @@ impl<C> Sparkle<C> {
         }))
     }
 
-    pub fn reset_update_cycle_after_short_delay(&self) -> Result<()> {
+    pub fn reset_update_cycle_after_short_delay(&self) {
         self.dispatch(|c| c.updater().reset_update_cycle_after_short_delay());
-        Ok(())
     }
 
-    pub fn allowed_channels(&self) -> Result<Option<Vec<String>>> {
-        Ok(self.dispatch_delegate(|d| d.allowed_channels()))
+    pub fn allowed_channels(&self) -> Option<Vec<String>> {
+        self.dispatch_delegate(|d| d.allowed_channels())
     }
 
-    pub fn set_allowed_channels(&self, channels: Option<Vec<String>>) -> Result<()> {
+    pub fn set_allowed_channels(&self, channels: impl Into<Option<Vec<String>>>) {
+        let channels = channels.into();
         self.dispatch_delegate(|d| d.set_allowed_channels(channels));
-        Ok(())
     }
 
-    pub fn feed_url_override(&self) -> Result<Option<String>> {
-        Ok(self.dispatch_delegate(|d| d.feed_url_override()))
+    pub fn feed_url_override(&self) -> Option<String> {
+        self.dispatch_delegate(|d| d.feed_url_override())
     }
 
-    pub fn set_feed_url_override(&self, url: Option<String>) -> Result<()> {
+    pub fn set_feed_url_override(&self, url: Option<String>) {
         self.dispatch_delegate(|d| d.set_feed_url_override(url));
-        Ok(())
     }
 
-    pub fn feed_parameters(&self) -> Result<Option<HashMap<String, String>>> {
+    pub fn feed_parameters(&self) -> Result<HashMap<String, String>> {
         Ok(self.dispatch_delegate(|d| d.feed_parameters()))
     }
 
-    pub fn set_feed_parameters(&self, params: Option<HashMap<String, String>>) -> Result<()> {
+    pub fn set_feed_parameters(&self, params: HashMap<String, String>) {
         self.dispatch_delegate(|d| d.set_feed_parameters(params));
-        Ok(())
     }
 
-    pub fn should_download_release_notes(&self) -> Result<bool> {
-        Ok(self.dispatch_delegate(|d| d.should_download_release_notes()))
+    pub fn should_download_release_notes(&self) -> bool {
+        self.dispatch_delegate(|d| d.should_download_release_notes())
     }
 
-    pub fn set_should_download_release_notes(&self, enabled: bool) -> Result<()> {
+    pub fn set_should_download_release_notes(&self, enabled: bool) {
         self.dispatch_delegate(|d| d.set_should_download_release_notes(enabled));
-        Ok(())
     }
 
-    pub fn should_relaunch_application(&self) -> Result<bool> {
-        Ok(self.dispatch_delegate(|d| d.should_relaunch()))
+    pub fn should_relaunch_application(&self) -> bool {
+        self.dispatch_delegate(|d| d.should_relaunch())
     }
 
-    pub fn set_should_relaunch_application(&self, enabled: bool) -> Result<()> {
+    pub fn set_should_relaunch_application(&self, enabled: bool) {
         self.dispatch_delegate(|d| d.set_should_relaunch(enabled));
-        Ok(())
     }
 
-    pub fn may_check_for_updates_config(&self) -> Result<bool> {
-        Ok(self.dispatch_delegate(|d| d.may_check_for_updates()))
+    pub fn may_check_for_updates_config(&self) -> bool {
+        self.dispatch_delegate(|d| d.may_check_for_updates())
     }
 
-    pub fn set_may_check_for_updates_config(&self, enabled: bool) -> Result<()> {
+    pub fn set_may_check_for_updates_config(&self, enabled: bool) {
         self.dispatch_delegate(|d| d.set_may_check_for_updates(enabled));
-        Ok(())
     }
 
     pub fn should_proceed_with_update(&self) -> Result<bool> {
@@ -395,17 +388,37 @@ impl<C> Sparkle<C> {
         Ok(())
     }
 
+    /// Sets the callback that will be called when new events arrive. See [`Event`] to see which events are available.
     pub fn set_event_callback(&self, callback: impl Fn(Event<'_>) + Send + Sync + 'static) {
-        self.dispatch_delegate(|d| d.set_event_callback(Arc::new(callback)))
+        self.dispatch_delegate(|d| d.set_event_callback(Box::new(callback)))
     }
 
-    pub fn download_request_headers(&self) -> Result<Option<HashMap<String, String>>> {
+    /// Version of [`set_event_callback`](Sparkle::set_event_callback) which does not require `Send + Sync`.
+    ///
+    /// Sets the callback that will be called when new events arrive. See [`Event`] to see which events are available.
+    ///
+    /// # Panics
+    ///
+    /// This will panic if not called from the main thread, as defined by macOS. With the `objc2-foundation` crate,
+    /// you can call `objc2_foundation::NSThread::current().isMainThread()` to ensure that this is true.
+    pub fn set_nonsync_event_callback(&self, callback: impl Fn(Event<'_>) + 'static) {
+        let mtm = MainThreadMarker::new().expect(
+            "`Sparkle::set_nonsync_event_callback` can only be called from the main thread",
+        );
+        self.updater.get(mtm).delegate.set_event_callback(Box::new(callback))
+    }
+
+    /// Gets any additional headers that will be added to the request when downloading an update.
+    ///
+    /// To set this value, see [`set_download_request_extra_headers`](Sparkle::set_download_request_extra_headers).
+    pub fn download_request_extra_headers(&self) -> Result<HashMap<String, String>> {
         Ok(self.dispatch_delegate(|d| d.download_request_headers()))
     }
 
-    pub fn set_download_request_headers(
+    /// Sets additional headers that will be added to the request when downloading an update.
+    pub fn set_download_request_extra_headers(
         &self,
-        headers: Option<HashMap<String, String>>,
+        headers: HashMap<String, String>,
     ) -> Result<()> {
         self.dispatch_delegate(|d| d.set_download_request_headers(headers));
         Ok(())
