@@ -85,7 +85,7 @@ define_class!(
             _updater: &NSObject,
             item: &SUAppcastItem,
         ) {
-        self.emit(Event::DidDownloadUpdate { item: item.into() });
+            self.emit(Event::DidDownloadUpdate { item: item.into() });
         }
 
         #[unsafe(method(updater:willInstallUpdate:))]

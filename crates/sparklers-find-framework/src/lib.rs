@@ -85,6 +85,5 @@ pub fn setup_sparkle_framework() {
     println!("cargo::rustc-link-lib=framework=Sparkle");
     println!("cargo::rustc-link-lib=framework=AppKit");
     println!("cargo::rustc-link-lib=framework=Foundation");
-    println!("cargo::rustc-link-arg=-Wl,-rpath,{framework_dir}");
     println!("cargo::rerun-if-env-changed=SPARKLE_FRAMEWORK_DIR");
 }
