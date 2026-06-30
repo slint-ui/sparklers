@@ -1,4 +1,8 @@
-use std::ops::Deref;
+use std::{
+    borrow::Borrow,
+    fmt::{self, Write as _},
+    ops::Deref,
+};
 
 use objc2::{msg_send, rc::Retained};
 use objc2_foundation::{NSError, NSMutableURLRequest, NSNumber, NSString, NSURL};
@@ -122,14 +126,138 @@ impl Deref for AppcastItemRef<'_> {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
-pub struct SparkleErrorRef<'a> {
-    inner: &'a NSError,
+#[derive(Debug)]
+enum RetainedCow<'a, T> {
+    Retained(Retained<T>),
+    Borrowed(&'a T),
 }
 
-impl SparkleErrorRef<'_> {
+impl<T> From<Retained<T>> for RetainedCow<'_, T> {
+    fn from(value: Retained<T>) -> Self {
+        Self::Retained(value)
+    }
+}
+
+impl<'a, T> From<&'a T> for RetainedCow<'a, T> {
+    fn from(value: &'a T) -> Self {
+        Self::Borrowed(value)
+    }
+}
+
+impl<T> Clone for RetainedCow<'_, T>
+where
+    Retained<T>: Clone,
+{
+    fn clone(&self) -> Self {
+        match self {
+            Self::Retained(arg0) => Self::Retained(arg0.clone()),
+            Self::Borrowed(arg0) => Self::Borrowed(arg0),
+        }
+    }
+}
+
+impl<'a, T> RetainedCow<'a, T>
+where
+    Retained<T>: From<&'a T>,
+{
+    pub fn into_retained(self) -> Retained<T> {
+        match self {
+            RetainedCow::Retained(retained) => retained,
+            RetainedCow::Borrowed(val) => val.into(),
+        }
+    }
+
+    pub fn into_owned(self) -> RetainedCow<'static, T> {
+        RetainedCow::Retained(self.into_retained())
+    }
+}
+
+impl<T> Borrow<T> for RetainedCow<'_, T> {
+    fn borrow(&self) -> &T {
+        self
+    }
+}
+
+impl<T> AsRef<T> for RetainedCow<'_, T> {
+    fn as_ref(&self) -> &T {
+        self
+    }
+}
+
+impl<T> Deref for RetainedCow<'_, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            RetainedCow::Retained(retained) => retained,
+            RetainedCow::Borrowed(borrowed) => borrowed,
+        }
+    }
+}
+
+struct Indented<T>(T);
+
+impl<T> fmt::Write for Indented<T>
+where
+    T: fmt::Write,
+{
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        for (i, line) in s.split('\n').enumerate() {
+            if i > 0 {
+                self.0.write_char('\n')?;
+            }
+
+            // Don't render the line unless it actually has text on it
+            if line.is_empty() {
+                continue;
+            }
+
+            write!(self.0, "  ")?;
+            self.0.write_str(line)?;
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SparkleError<'a> {
+    inner: RetainedCow<'a, NSError>,
+}
+
+impl fmt::Display for SparkleError<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let backtrace_enabled = std::env::var("RUST_BACKTRACE").is_ok_and(|val| !val.is_empty());
+
+        write!(f, "{}", self.inner.localizedDescription())?;
+
+        if backtrace_enabled {
+            write!(f, "Backtrace:")?;
+
+            let mut indented = Indented(f);
+
+            for err in self.backtrace() {
+                write!(&mut indented, "{err}")?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl SparkleError<'_> {
+    pub fn into_owned(self) -> SparkleError<'static> {
+        SparkleError { inner: self.inner.into_owned() }
+    }
+}
+
+impl SparkleError<'_> {
     pub fn message(&self) -> String {
         self.inner.localizedDescription().to_string()
+    }
+
+    pub fn backtrace(&self) -> Vec<SparkleError<'static>> {
+        self.inner.underlyingErrors().iter().map(|err| SparkleError { inner: err.into() }).collect()
     }
 
     pub fn code(&self) -> isize {
@@ -141,9 +269,9 @@ impl SparkleErrorRef<'_> {
     }
 }
 
-impl<'a> From<&'a NSError> for SparkleErrorRef<'a> {
+impl<'a> From<&'a NSError> for SparkleError<'a> {
     fn from(value: &'a NSError) -> Self {
-        Self { inner: value }
+        Self { inner: value.into() }
     }
 }
 
@@ -209,9 +337,9 @@ pub enum Event<'a> {
     WillDownloadUpdate { item: AppcastItemRef<'a>, request: &'a NSMutableURLRequest },
     DidDownloadUpdate { item: AppcastItemRef<'a> },
     WillInstallUpdate { item: AppcastItemRef<'a> },
-    DidAbortWithError { error: SparkleErrorRef<'a> },
-    DidFinishUpdateCycle { kind: UpdateCheckKind, error: Option<SparkleErrorRef<'a>> },
-    FailedToDownloadUpdate { item: AppcastItemRef<'a>, error: SparkleErrorRef<'a> },
+    DidAbortWithError { error: SparkleError<'a> },
+    DidFinishUpdateCycle { kind: UpdateCheckKind, error: Option<SparkleError<'a>> },
+    FailedToDownloadUpdate { item: AppcastItemRef<'a>, error: SparkleError<'a> },
     UserDidCancelDownload,
     WillExtractUpdate { item: AppcastItemRef<'a> },
     DidExtractUpdate { item: AppcastItemRef<'a> },

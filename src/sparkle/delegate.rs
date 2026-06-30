@@ -9,7 +9,7 @@ use objc2_foundation::{
 };
 use sparklers_sys::SUAppcastItem;
 
-use crate::events::{Event, SparkleErrorRef};
+use crate::events::{Event, SparkleError};
 
 pub type EventCallback = Box<dyn Fn(Event<'_>)>;
 
@@ -115,7 +115,7 @@ define_class!(
         ) {
             self.emit(Event::DidFinishUpdateCycle{
                kind: update_check.into(),
-                error: error.map(SparkleErrorRef::from),
+                error: error.map(SparkleError::from),
             });
         }
 

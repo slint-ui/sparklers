@@ -1,17 +1,16 @@
 use objc2_foundation::{NSDate, NSRunLoop};
-use sparklers::{Event, Sparkle, SparkleConfig};
+use sparklers::{Event, Sparkle};
 
 embed_plist::embed_info_plist!(concat!(env!("CARGO_MANIFEST_DIR"), "/Info.plist"));
 
 fn main() {
     let run_loop = NSRunLoop::currentRunLoop();
 
-    let update =
-        Sparkle::new(SparkleConfig { version: env!("CARGO_PKG_VERSION").into() }).unwrap().unwrap();
+    let update = Sparkle::new().unwrap().unwrap();
 
     update.feed_url().unwrap();
-    update.check_for_update_information().unwrap();
-    update.check_for_updates_in_background().unwrap();
+    update.check_for_update_information();
+    update.check_for_updates_in_background();
 
     update.set_event_callback(|event| {
         dbg!(&event);

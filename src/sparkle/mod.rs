@@ -84,34 +84,12 @@ fn check_info_plist_keys() {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct SparkleConfig {
-    pub version: String,
-}
-
-pub trait GetSparkleConfig {
-    fn sparkle_config(&self) -> SparkleConfig;
-}
-
-impl<C> GetSparkleConfig for C
-where
-    C: AsRef<SparkleConfig>,
-{
-    fn sparkle_config(&self) -> SparkleConfig {
-        self.as_ref().clone()
-    }
-}
-
-pub struct Sparkle<C = SparkleConfig> {
+pub struct Sparkle {
     updater: MainThreadBound<SparkleUpdater>,
-    config: C,
 }
 
-impl<C> Sparkle<C>
-where
-    C: Send + 'static,
-{
-    pub fn new(config: C) -> Result<Option<Self>> {
+impl Sparkle {
+    pub fn new() -> Result<Option<Self>> {
         if !is_valid_bundle() {
             warn!(
                 "Sparkle updater disabled: not running inside a valid macOS bundle. This is \
@@ -120,9 +98,7 @@ where
             return Ok(None);
         }
 
-        run_on_main(|mtm| init_on_main_thread(mtm))
-            .map(move |updater| Self { config, updater })
-            .map(Some)
+        run_on_main(|mtm| init_on_main_thread(mtm)).map(move |updater| Self { updater }).map(Some)
     }
 }
 
@@ -131,17 +107,7 @@ pub struct SparkleUpdater {
     delegate: Retained<SparkleDelegate>,
 }
 
-// TODO: Probably unnecessary?
-impl<C> Sparkle<C>
-where
-    C: GetSparkleConfig,
-{
-    pub fn current_version(&self) -> Result<String> {
-        Ok(self.config.sparkle_config().version)
-    }
-}
-
-impl<C> Sparkle<C> {
+impl Sparkle {
     fn dispatch<T, F>(&self, f: F) -> T
     where
         T: Send,
@@ -158,28 +124,26 @@ impl<C> Sparkle<C> {
         self.updater.get_on_main(|updater| f(&updater.delegate))
     }
 
-    pub fn check_for_updates(&self) -> Result<()> {
+    pub fn check_for_updates(&self) {
         self.dispatch(|c| c.check_for_updates(None));
-        Ok(())
     }
 
-    pub fn check_for_updates_in_background(&self) -> Result<()> {
+    pub fn check_for_updates_in_background(&self) {
         self.dispatch(|c| c.updater().check_for_updates_in_background());
-        Ok(())
     }
 
-    pub fn can_check_for_updates(&self) -> Result<bool> {
-        Ok(self.dispatch(|c| c.updater().can_check_for_updates()))
+    pub fn can_check_for_updates(&self) -> bool {
+        self.dispatch(|c| c.updater().can_check_for_updates())
     }
 
-    pub fn feed_url(&self) -> Result<Option<String>> {
-        Ok(self.dispatch(|c| {
+    pub fn feed_url(&self) -> Option<String> {
+        self.dispatch(|c| {
             c.updater().feed_url().and_then(|url| {
                 let abs: Option<Retained<NSString>> =
                     unsafe { objc2::msg_send![&url, absoluteString] };
                 abs.map(|s| s.to_string())
             })
-        }))
+        })
     }
 
     pub fn set_feed_url(&self, url: &str) -> Result<()> {
@@ -197,58 +161,53 @@ impl<C> Sparkle<C> {
         Ok(())
     }
 
-    pub fn automatically_checks_for_updates(&self) -> Result<bool> {
-        Ok(self.dispatch(|c| c.updater().automatically_checks_for_updates()))
+    pub fn automatically_checks_for_updates(&self) -> bool {
+        self.dispatch(|c| c.updater().automatically_checks_for_updates())
     }
 
-    pub fn set_automatically_checks_for_updates(&self, enabled: bool) -> Result<()> {
+    pub fn set_automatically_checks_for_updates(&self, enabled: bool) {
         self.dispatch(|c| c.updater().set_automatically_checks_for_updates(enabled));
-        Ok(())
     }
 
-    pub fn automatically_downloads_updates(&self) -> Result<bool> {
-        Ok(self.dispatch(|c| c.updater().automatically_downloads_updates()))
+    pub fn automatically_downloads_updates(&self) -> bool {
+        self.dispatch(|c| c.updater().automatically_downloads_updates())
     }
 
-    pub fn set_automatically_downloads_updates(&self, enabled: bool) -> Result<()> {
+    pub fn set_automatically_downloads_updates(&self, enabled: bool) {
         self.dispatch(|c| c.updater().set_automatically_downloads_updates(enabled));
-        Ok(())
     }
 
-    pub fn last_update_check_date(&self) -> Result<Option<f64>> {
-        Ok(self.dispatch(|c| {
+    pub fn last_update_check_date(&self) -> Option<f64> {
+        self.dispatch(|c| {
             c.updater().last_update_check_date().map(|date| {
                 let seconds: f64 = unsafe { objc2::msg_send![&date, timeIntervalSince1970] };
                 seconds * 1000.0
             })
-        }))
+        })
     }
 
-    pub fn reset_update_cycle(&self) -> Result<()> {
+    pub fn reset_update_cycle(&self) {
         self.dispatch(|c| c.updater().reset_update_cycle());
-        Ok(())
     }
 
-    pub fn update_check_interval(&self) -> Result<f64> {
-        Ok(self.dispatch(|c| c.updater().update_check_interval()))
+    pub fn update_check_interval(&self) -> f64 {
+        self.dispatch(|c| c.updater().update_check_interval())
     }
 
-    pub fn set_update_check_interval(&self, interval: f64) -> Result<()> {
+    pub fn set_update_check_interval(&self, interval: f64) {
         self.dispatch(|c| c.updater().set_update_check_interval(interval));
-        Ok(())
     }
 
-    pub fn check_for_update_information(&self) -> Result<()> {
+    pub fn check_for_update_information(&self) {
         self.dispatch(|c| c.updater().check_for_update_information());
-        Ok(())
     }
 
-    pub fn session_in_progress(&self) -> Result<bool> {
-        Ok(self.dispatch(|c| c.updater().session_in_progress()))
+    pub fn session_in_progress(&self) -> bool {
+        self.dispatch(|c| c.updater().session_in_progress())
     }
 
-    pub fn http_headers(&self) -> Result<Option<HashMap<String, String>>> {
-        Ok(self.dispatch(|c| {
+    pub fn http_headers(&self) -> Option<HashMap<String, String>> {
+        self.dispatch(|c| {
             c.updater().http_headers().map(|dict| {
                 let mut map = HashMap::new();
                 let count: usize = unsafe { objc2::msg_send![&dict, count] };
@@ -266,10 +225,10 @@ impl<C> Sparkle<C> {
                 }
                 map
             })
-        }))
+        })
     }
 
-    pub fn set_http_headers(&self, headers: Option<HashMap<String, String>>) -> Result<()> {
+    pub fn set_http_headers(&self, headers: Option<HashMap<String, String>>) {
         self.dispatch(move |c| {
             let ns_dict = headers.map(|h| {
                 let keys: Vec<Retained<NSString>> =
@@ -282,39 +241,36 @@ impl<C> Sparkle<C> {
             });
             c.updater().set_http_headers(ns_dict.as_deref());
         });
-        Ok(())
     }
 
-    pub fn user_agent_string(&self) -> Result<String> {
-        Ok(self.dispatch(|c| c.updater().user_agent_string().to_string()))
+    pub fn user_agent_string(&self) -> String {
+        self.dispatch(|c| c.updater().user_agent_string().to_string())
     }
 
-    pub fn set_user_agent_string(&self, user_agent: &str) -> Result<()> {
+    pub fn set_user_agent_string(&self, user_agent: &str) {
         let ua = user_agent.to_string();
         self.dispatch(move |c| {
             let ns_string = NSString::from_str(&ua);
             c.updater().set_user_agent_string(&ns_string);
         });
-        Ok(())
     }
 
-    pub fn sends_system_profile(&self) -> Result<bool> {
-        Ok(self.dispatch(|c| c.updater().sends_system_profile()))
+    pub fn sends_system_profile(&self) -> bool {
+        self.dispatch(|c| c.updater().sends_system_profile())
     }
 
-    pub fn set_sends_system_profile(&self, sends: bool) -> Result<()> {
+    pub fn set_sends_system_profile(&self, sends: bool) {
         self.dispatch(|c| c.updater().set_sends_system_profile(sends));
-        Ok(())
     }
 
-    pub fn clear_feed_url_from_user_defaults(&self) -> Result<Option<String>> {
-        Ok(self.dispatch(|c| {
+    pub fn clear_feed_url_from_user_defaults(&self) -> Option<String> {
+        self.dispatch(|c| {
             c.updater().clear_feed_url_from_user_defaults().and_then(|url| {
                 let abs: Option<Retained<NSString>> =
                     unsafe { objc2::msg_send![&url, absoluteString] };
                 abs.map(|s| s.to_string())
             })
-        }))
+        })
     }
 
     pub fn reset_update_cycle_after_short_delay(&self) {
@@ -338,8 +294,8 @@ impl<C> Sparkle<C> {
         self.dispatch_delegate(|d| d.set_feed_url_override(url));
     }
 
-    pub fn feed_parameters(&self) -> Result<HashMap<String, String>> {
-        Ok(self.dispatch_delegate(|d| d.feed_parameters()))
+    pub fn feed_parameters(&self) -> HashMap<String, String> {
+        self.dispatch_delegate(|d| d.feed_parameters())
     }
 
     pub fn set_feed_parameters(&self, params: HashMap<String, String>) {
@@ -370,22 +326,20 @@ impl<C> Sparkle<C> {
         self.dispatch_delegate(|d| d.set_may_check_for_updates(enabled));
     }
 
-    pub fn should_proceed_with_update(&self) -> Result<bool> {
-        Ok(self.dispatch_delegate(|d| d.should_proceed_with_update()))
+    pub fn should_proceed_with_update(&self) -> bool {
+        self.dispatch_delegate(|d| d.should_proceed_with_update())
     }
 
-    pub fn set_should_proceed_with_update(&self, enabled: bool) -> Result<()> {
+    pub fn set_should_proceed_with_update(&self, enabled: bool) {
         self.dispatch_delegate(|d| d.set_should_proceed_with_update(enabled));
-        Ok(())
     }
 
-    pub fn decryption_password(&self) -> Result<Option<String>> {
-        Ok(self.dispatch_delegate(|d| d.decryption_password()))
+    pub fn decryption_password(&self) -> Option<String> {
+        self.dispatch_delegate(|d| d.decryption_password())
     }
 
-    pub fn set_decryption_password(&self, password: Option<String>) -> Result<()> {
+    pub fn set_decryption_password(&self, password: Option<String>) {
         self.dispatch_delegate(|d| d.set_decryption_password(password));
-        Ok(())
     }
 
     /// Sets the callback that will be called when new events arrive. See [`Event`] to see which events are available.
@@ -411,16 +365,12 @@ impl<C> Sparkle<C> {
     /// Gets any additional headers that will be added to the request when downloading an update.
     ///
     /// To set this value, see [`set_download_request_extra_headers`](Sparkle::set_download_request_extra_headers).
-    pub fn download_request_extra_headers(&self) -> Result<HashMap<String, String>> {
-        Ok(self.dispatch_delegate(|d| d.download_request_headers()))
+    pub fn download_request_extra_headers(&self) -> HashMap<String, String> {
+        self.dispatch_delegate(|d| d.download_request_headers())
     }
 
     /// Sets additional headers that will be added to the request when downloading an update.
-    pub fn set_download_request_extra_headers(
-        &self,
-        headers: HashMap<String, String>,
-    ) -> Result<()> {
+    pub fn set_download_request_extra_headers(&self, headers: HashMap<String, String>) {
         self.dispatch_delegate(|d| d.set_download_request_headers(headers));
-        Ok(())
     }
 }
